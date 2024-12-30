@@ -28,10 +28,7 @@ pub fn build(b: *std.Build) void {
         exe.linkSystemLibrary("openal");
     }
 
-    // includes
     exe.addIncludePath(b.path("vendor/include"));
-
-    // finalize
     b.installArtifact(exe);
 
     // Run command

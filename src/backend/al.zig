@@ -147,6 +147,12 @@ pub const Source = struct {
         al.alSourcePause(self.al_source);
     }
 
+    pub fn get_time(self: *const Source) f32 {
+        var seconds: f32 = undefined;
+        al.alGetSourcef(self.al_source, al.AL_SEC_OFFSET, &seconds);
+        return seconds;
+    }
+
     pub fn seek(self: *const Source, seconds: f32) void {
         al.alSourcef(self.al_source, al.AL_SEC_OFFSET, seconds);
     }
