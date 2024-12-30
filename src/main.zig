@@ -1,118 +1,107 @@
 const std = @import("std");
-const al = @import("al.zig");
+const al = @import("backend/al.zig");
+const dr = @import("backend/dr_libs.zig");
+const Opus = @import("backend/opus.zig");
+const Vorbis = @import("backend/stb_vorbis.zig");
+const AudioFile = @import("backend/audio_file.zig").AudioFile;
 
-const dr = @cImport({
-    @cDefine("DR_WAV_NO_STDIO", "1");
-    @cDefine("DR_WAV_NO_WCHAR", "1");
-    @cInclude("dr_libs/dr_wav.h");
-
-    @cDefine("DR_MP3_NO_STDIO", "1");
-    @cDefine("DR_MP3_NO_WCHAR", "1");
-    @cInclude("dr_libs/dr_mp3.h");
-
-    @cDefine("DR_FLAC_NO_STDIO", "1");
-    @cDefine("DR_FLAC_NO_WCHAR", "1");
-    @cInclude("dr_libs/dr_flac.h");
-});
-
-const stb = @cImport({
-    @cDefine("STB_VORBIS_NO_STDIO", "1");
-    @cInclude("stb/stb_vorbis.h");
-});
-
-fn playFile(file_path: []const u8) !al.al.ALuint {
-    var source: al.al.ALuint = 0;
-    al.al.alGenSources(1, &source);
-    al.al.alSourcei(source, al.al.AL_LOOPING, al.al.AL_FALSE);
-
-    var buffer: al.al.ALuint = 0;
-    al.al.alGenBuffers(1, &buffer);
-
-    const start = try std.time.Instant.now();
-    const file = try std.fs.cwd().openFile(file_path, .{});
-
-    const data = try file.readToEndAlloc(std.heap.page_allocator, std.math.maxInt(usize));
-    file.close();
-
-    var frames: c_int = 0;
-    var channels: c_int = 0;
-    var rate: c_int = 0;
-    var pcm: ?*c_short = null;
-    frames = stb.stb_vorbis_decode_memory(@ptrCast(data), @intCast(data.len), &channels, &rate, &pcm);
-
-    std.heap.page_allocator.free(data);
-
-    const size: al.al.ALsizei = @intCast(frames * @sizeOf(dr.drflac_int16) * channels);
-    al.al.alBufferData(buffer, al.al.AL_FORMAT_STEREO16, pcm, size, @intCast(rate));
-
-    dr.drflac_free(pcm, null);
-
-    al.al.alSourcei(source, al.al.AL_BUFFER, @intCast(buffer));
-    al.al.alSourcef(source, al.al.AL_GAIN, 0.5);
-
-    const now47 = try std.time.Instant.now();
-    std.debug.print("took {d} ms to play\n", .{now47.since(start) / std.time.ns_per_ms});
-
-    return source;
-}
-
-var bf: al.al.ALuint = 0;
-
-fn loadShitter(file_path: []const u8) void {
-    bf = playFile(file_path) catch return;
-}
+var device: al.Device = undefined;
+var context: al.Context = undefined;
 
 pub fn main() !void {
-    const device = al.Device.init(al.Device.get_default_name());
+    const cwd = std.fs.cwd();
+
+    device = al.Device.init(al.Device.get_default_name());
     if (!device.is_valid()) {
         std.log.err("Failed to open default device", .{});
-        return error.FailedToOpenDefaultDevice;
+        return;
     }
 
     defer device.deinit();
 
+    // technically opt in (but we have it), so force off hrtf for more "correct" stereo sound on all devices
     const attribs = [_]c_int{ al.Attributes.HRTF, al.Attributes.FALSE, 0 };
-    const context = al.Context.init(&device, &attribs);
+    context = al.Context.init(&device, &attribs);
     defer context.deinit();
 
     if (!context.make_current()) {
         std.log.err("Failed to make context current", .{});
-        return error.FailedToMakeContextCurrent;
+        return;
     }
 
-    const start = try std.time.Instant.now();
-    _ = try std.Thread.spawn(.{}, loadShitter, .{"/home/riley/mass_storage/user/games/funkin/Marios Madness/assets/songs/unbeatable/Voices.ogg"});
-    const inst = try playFile("/home/riley/mass_storage/user/games/funkin/Marios Madness/assets/songs/unbeatable/Inst.ogg");
-
-    while (bf == 0) {
-        std.time.sleep(100);
+    const args = try std.process.argsAlloc(std.heap.page_allocator);
+    if (args.len < 2) {
+        std.debug.print("No file supplied\n", .{});
+        return;
     }
 
-    al.al.alSourcePlay(inst);
-    al.al.alSourcePlay(bf);
-    const now47 = try std.time.Instant.now();
-    std.debug.print("took {d} ms to play SONG\n", .{now47.since(start) / std.time.ns_per_ms});
+    const path = args[1];
+    const ext = std.fs.path.extension(path);
+    const zig_file = cwd.openFile(path, .{}) catch |err| switch (err) {
+        std.fs.File.OpenError.FileNotFound => {
+            std.log.err("Couldn't find unbeatable.wav in current directory.", .{});
+            return;
+        },
+        else => {
+            std.log.err("Unhandled error: {}", .{err});
+            return;
+        },
+    };
 
-    var state: al.al.ALint = 0;
-    var last = try std.time.Instant.now();
-    var tps: u64 = 0;
-    while (true) {
-        al.al.alGetSourcei(inst, al.al.AL_SOURCE_STATE, &state);
-        if (state != al.al.AL_PLAYING) {
-            break;
-        }
+    const start = std.time.nanoTimestamp();
 
-        const now = try std.time.Instant.now();
-        tps += 1;
-        if (now.since(last) > std.time.ns_per_s) {
-            std.debug.print("\r{d} TPS", .{tps});
-            tps = 0;
-            last = now;
-        }
-
-        std.time.sleep(std.time.ns_per_s);
+    const bit_depth: AudioFile.BitDepth = AudioFile.BitDepth.Float32;
+    var loading_file: ?AudioFile = null;
+    const ext_lower = try std.ascii.allocLowerString(std.heap.page_allocator, ext);
+    if (std.mem.eql(u8, ext_lower, ".mp3")) {
+        loading_file = try dr.MP3.decode_file(zig_file, bit_depth, std.heap.page_allocator);
+    } else if (std.mem.eql(u8, ext_lower, ".flac")) {
+        loading_file = try dr.FLAC.decode_file(zig_file, bit_depth, std.heap.page_allocator);
+    } else if (std.mem.eql(u8, ext_lower, ".wav")) {
+        loading_file = try dr.WAV.decode_file(zig_file, bit_depth, std.heap.page_allocator);
+    } else if (std.mem.eql(u8, ext_lower, ".ogg")) {
+        loading_file = try Vorbis.decode_file(zig_file, bit_depth, std.heap.page_allocator);
+    } else if (std.mem.eql(u8, ext_lower, ".opus")) {
+        loading_file = try Opus.decode_file(zig_file, bit_depth, std.heap.page_allocator);
     }
 
-    al.al.alDeleteSources(1, &inst);
-    al.al.alDeleteSources(1, &bf);
+    if (loading_file == null) {
+        std.log.err("Couldn't find decoder for extension '{s}'!", .{ext_lower});
+        std.heap.page_allocator.free(ext_lower);
+        return;
+    }
+
+    const file = loading_file.?;
+
+    std.heap.page_allocator.free(ext_lower);
+    std.debug.print("took {} ms\n", .{@divFloor(std.time.nanoTimestamp() - start, 1_000_000)});
+
+    const source = al.Source.init();
+    defer source.deinit();
+
+    source.set_volume(0.1);
+
+    const buffer = al.Buffer.init();
+    defer buffer.deinit();
+
+    const format = switch (file.channels) {
+        1 => switch (file.bit_depth) {
+            .Signed16 => al.Formats.MONO16,
+            .Float32 => al.Formats.MONO_FLOAT32,
+        },
+        else => switch (file.bit_depth) {
+            .Signed16 => al.Formats.STEREO16,
+            .Float32 => al.Formats.STEREO_FLOAT32,
+        },
+    };
+
+    buffer.buffer_data(file.frames, format, @intCast(file.get_size()), @intCast(file.sample_rate));
+    file.free();
+
+    source.bind_buffer(&buffer);
+    source.play();
+
+    while (source.is_playing()) {
+        std.time.sleep(1_000_000_000);
+    }
 }
