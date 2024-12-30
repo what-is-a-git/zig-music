@@ -35,6 +35,9 @@ pub fn init(file: std.fs.File, format: AudioFormat.SupportedFormat) InitError!Au
     }
 
     self.stream = switch (format) {
+        .WAVE => dr.WAV.open_stream(file, std.heap.page_allocator) catch |err| return err,
+        .FLAC => dr.FLAC.open_stream(file, std.heap.page_allocator) catch |err| return err,
+        .MP3 => dr.MP3.open_stream(file, std.heap.page_allocator) catch |err| return err,
         .OGG_OPUS => Opus.open_stream(file, std.heap.page_allocator) catch |err| return err,
         else => unreachable,
     };
@@ -65,6 +68,9 @@ pub fn fill_buffers(self: *AudioStreamer) AudioStream.DecodeError!void {
 pub fn stream_into(self: *AudioStreamer, buffer: al.Buffer) AudioStream.DecodeError!void {
     const FRAME_COUNT: usize = @divFloor(self.stream.sample_rate, 10);
     const pcm: AudioStream.DecodedPCM = switch (self.format) {
+        .WAVE => dr.WAV.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
+        .FLAC => dr.FLAC.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
+        .MP3 => dr.MP3.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         .OGG_OPUS => Opus.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         else => unreachable,
     };
@@ -99,6 +105,9 @@ pub fn deinit(self: *const AudioStreamer) void {
     }
 
     switch (self.format) {
+        .WAVE => dr.WAV.close_stream(self.stream),
+        .FLAC => dr.FLAC.close_stream(self.stream),
+        .MP3 => dr.MP3.close_stream(self.stream),
         .OGG_OPUS => Opus.close_stream(self.stream),
         else => unreachable,
     }
@@ -127,6 +136,9 @@ pub fn get_time(self: *const AudioStreamer) f32 {
 pub fn seek(self: *const AudioStreamer, seconds: f32) void {
     const sample: usize = @intFromFloat(@floor(seconds * @as(f32, @floatFromInt(self.stream.sample_rate))));
     switch (self.format) {
+        .WAVE => dr.WAV.seek_stream(self.stream, sample),
+        .FLAC => dr.FLAC.seek_stream(self.stream, sample),
+        .MP3 => dr.MP3.seek_stream(self.stream, sample),
         .OGG_OPUS => Opus.seek_stream(self.stream, sample),
         else => unreachable,
     }

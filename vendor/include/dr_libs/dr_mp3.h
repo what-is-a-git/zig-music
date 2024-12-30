@@ -374,7 +374,8 @@ typedef struct
     size_t dataCapacity;
     size_t dataConsumed;
     drmp3_uint8* pData;
-    drmp3_bool32 atEnd : 1;
+    // why was this a bitfield before :sob:
+    drmp3_bool32 atEnd;
     struct
     {
         const drmp3_uint8* pData;

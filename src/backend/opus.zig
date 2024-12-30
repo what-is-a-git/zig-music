@@ -1,9 +1,7 @@
 const std = @import("std");
 
 const BitFormat = @import("../core/audio/format.zig").BitFormat;
-
 const AudioStream = @import("audio_stream.zig");
-
 const AudioFile = @import("audio_file.zig");
 
 const FileReader = @import("file_reader.zig");
@@ -80,7 +78,6 @@ pub fn decode_stream(stream: AudioStream, requested_format: BitFormat, count: us
 
     const output_count = count * stream.channels;
     const size = output_count * requested_format.get_size();
-
     switch (requested_format) {
         .SignedInt16 => {
             const frames = std.c.malloc(size);
