@@ -39,6 +39,7 @@ pub fn init(file: std.fs.File, format: AudioFormat.SupportedFormat) InitError!Au
         .FLAC => dr.FLAC.open_stream(file, std.heap.page_allocator) catch |err| return err,
         .MP3 => dr.MP3.open_stream(file, std.heap.page_allocator) catch |err| return err,
         .OGG_OPUS => Opus.open_stream(file, std.heap.page_allocator) catch |err| return err,
+        .OGG_VORBIS => Vorbis.open_stream(file, std.heap.page_allocator) catch |err| return err,
         else => unreachable,
     };
 
@@ -72,6 +73,7 @@ pub fn stream_into(self: *AudioStreamer, buffer: al.Buffer) AudioStream.DecodeEr
         .FLAC => dr.FLAC.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         .MP3 => dr.MP3.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         .OGG_OPUS => Opus.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
+        .OGG_VORBIS => Vorbis.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         else => unreachable,
     };
     defer pcm.deinit();
@@ -109,6 +111,7 @@ pub fn deinit(self: *const AudioStreamer) void {
         .FLAC => dr.FLAC.close_stream(self.stream),
         .MP3 => dr.MP3.close_stream(self.stream),
         .OGG_OPUS => Opus.close_stream(self.stream),
+        .OGG_VORBIS => Vorbis.close_stream(self.stream),
         else => unreachable,
     }
 }
@@ -140,6 +143,7 @@ pub fn seek(self: *const AudioStreamer, seconds: f32) void {
         .FLAC => dr.FLAC.seek_stream(self.stream, sample),
         .MP3 => dr.MP3.seek_stream(self.stream, sample),
         .OGG_OPUS => Opus.seek_stream(self.stream, sample),
+        .OGG_VORBIS => Vorbis.seek_stream(self.stream, sample),
         else => unreachable,
     }
 }

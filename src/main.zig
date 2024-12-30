@@ -18,6 +18,8 @@ pub fn main() !void {
     const cwd = std.fs.cwd();
     const path = args[1];
     const file = try cwd.openFile(path, .{});
+    defer file.close();
+
     const format = AudioFormat.identify_format(path);
     if (format == .UNIDENTIFIABLE) {
         std.log.err("Couldn't identify format from path '{s}'!", .{path});
