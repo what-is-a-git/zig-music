@@ -1,22 +1,23 @@
 const std = @import("std");
 
-const audio_file = @import("audio_file.zig");
-const read_file = audio_file.read_file;
-const AudioFile = audio_file.AudioFile;
-const ReadFileError = audio_file.ReadFileError;
+const BitFormat = @import("../core/audio/format.zig").BitFormat;
+
+const AudioFile = @import("audio_file.zig");
+const read_file = AudioFile.read_file;
+const ReadFileError = AudioFile.ReadFileError;
 
 const c = @cImport({
     @cDefine("STB_VORBIS_NO_STDIO", "1");
     @cInclude("stb/stb_vorbis.h");
 });
 
-pub fn decode_file(file: std.fs.File, requested_depth: AudioFile.BitDepth, allocator: std.mem.Allocator) ReadFileError!AudioFile {
+pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
     const bytes = read_file(file, allocator) catch |err| switch (err) {
         else => return err,
     };
 
     var output: AudioFile = .{
-        .bit_depth = requested_depth,
+        .bit_format = requested_format,
     };
 
     const vorbis = c.stb_vorbis_open_memory(bytes.ptr, @intCast(bytes.len), null, null);
@@ -25,8 +26,8 @@ pub fn decode_file(file: std.fs.File, requested_depth: AudioFile.BitDepth, alloc
     output.sample_rate = @intCast(info.sample_rate);
     output.frame_count = @intCast(c.stb_vorbis_stream_length_in_samples(vorbis));
 
-    switch (requested_depth) {
-        .Signed16 => {
+    switch (requested_format) {
+        .SignedInt16 => {
             output.frames = std.c.malloc(output.get_size());
             _ = c.stb_vorbis_get_samples_short_interleaved(
                 vorbis,

@@ -1,9 +1,10 @@
 const std = @import("std");
 
-const audio_file = @import("audio_file.zig");
-const read_file = audio_file.read_file;
-const AudioFile = audio_file.AudioFile;
-const ReadFileError = audio_file.ReadFileError;
+const BitFormat = @import("../core/audio/format.zig").BitFormat;
+
+const AudioFile = @import("audio_file.zig");
+const read_file = AudioFile.read_file;
+const ReadFileError = AudioFile.ReadFileError;
 
 const wav = @cImport({
     @cDefine("DR_WAV_NO_STDIO", "1");
@@ -21,17 +22,17 @@ const flac = @cImport({
 });
 
 pub const WAV = struct {
-    pub fn decode_file(file: std.fs.File, requested_depth: AudioFile.BitDepth, allocator: std.mem.Allocator) ReadFileError!AudioFile {
+    pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
         const bytes = read_file(file, allocator) catch |err| switch (err) {
             else => return err,
         };
 
         var output: AudioFile = .{
-            .bit_depth = requested_depth,
+            .bit_format = requested_format,
         };
 
-        switch (requested_depth) {
-            .Signed16 => {
+        switch (requested_format) {
+            .SignedInt16 => {
                 output.frames = wav.drwav_open_memory_and_read_pcm_frames_s16(
                     bytes.ptr,
                     bytes.len,
@@ -59,18 +60,18 @@ pub const WAV = struct {
 };
 
 pub const MP3 = struct {
-    pub fn decode_file(file: std.fs.File, requested_depth: AudioFile.BitDepth, allocator: std.mem.Allocator) ReadFileError!AudioFile {
+    pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
         const bytes = read_file(file, allocator) catch |err| switch (err) {
             else => return err,
         };
 
         var output: AudioFile = .{
-            .bit_depth = requested_depth,
+            .bit_format = requested_format,
         };
 
         var mp3_config: mp3.drmp3_config = .{ .channels = undefined, .sampleRate = undefined };
-        switch (requested_depth) {
-            .Signed16 => {
+        switch (requested_format) {
+            .SignedInt16 => {
                 output.frames = mp3.drmp3_open_memory_and_read_pcm_frames_s16(
                     bytes.ptr,
                     bytes.len,
@@ -99,17 +100,17 @@ pub const MP3 = struct {
 };
 
 pub const FLAC = struct {
-    pub fn decode_file(file: std.fs.File, requested_depth: AudioFile.BitDepth, allocator: std.mem.Allocator) ReadFileError!AudioFile {
+    pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
         const bytes = read_file(file, allocator) catch |err| switch (err) {
             else => return err,
         };
 
         var output: AudioFile = .{
-            .bit_depth = requested_depth,
+            .bit_format = requested_format,
         };
 
-        switch (requested_depth) {
-            .Signed16 => {
+        switch (requested_format) {
+            .SignedInt16 => {
                 output.frames = flac.drflac_open_memory_and_read_pcm_frames_s16(
                     bytes.ptr,
                     bytes.len,

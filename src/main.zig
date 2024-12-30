@@ -1,8 +1,7 @@
 const std = @import("std");
 
-const audio_file = @import("backend/audio_file.zig");
-const AudioFile = audio_file.AudioFile;
-const ReadFileError = audio_file.ReadFileError;
+const AudioFile = @import("backend/audio_file.zig");
+const ReadFileError = AudioFile.ReadFileError;
 
 const AudioFormat = @import("core/audio/format.zig");
 const AudioSampler = @import("core/audio/sampler.zig");

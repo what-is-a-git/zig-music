@@ -1,5 +1,10 @@
 const std = @import("std");
 
+pub const BitFormat = enum {
+    SignedInt16,
+    Float32,
+};
+
 pub const SupportedFormat = enum {
     // .wav
     WAVE,

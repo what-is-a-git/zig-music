@@ -5,11 +5,11 @@ const dr = @import("../../backend/dr_libs.zig");
 const Opus = @import("../../backend/opus.zig");
 const Vorbis = @import("../../backend/stb_vorbis.zig");
 
-const audio_file = @import("../../backend/audio_file.zig");
-const AudioFile = audio_file.AudioFile;
-const ReadFileError = audio_file.ReadFileError;
+const AudioFile = @import("../../backend/audio_file.zig");
+const ReadFileError = AudioFile.ReadFileError;
 
 const AudioFormat = @import("format.zig");
+const BitFormat = AudioFormat.BitFormat;
 
 const AudioSampler = @This();
 
@@ -22,23 +22,23 @@ pub fn init(file: std.fs.File, format: AudioFormat.SupportedFormat) ReadFileErro
     self.buffer = al.Buffer.init();
 
     var data: AudioFile = undefined;
-    const bit_depth: AudioFile.BitDepth = AudioFile.BitDepth.Float32;
+    const bit_format: BitFormat = .Float32;
     switch (format) {
-        .WAVE => data = dr.WAV.decode_file(file, bit_depth, std.heap.page_allocator) catch |err| return err,
-        .FLAC => data = dr.FLAC.decode_file(file, bit_depth, std.heap.page_allocator) catch |err| return err,
-        .MP3 => data = dr.MP3.decode_file(file, bit_depth, std.heap.page_allocator) catch |err| return err,
-        .OGG_VORBIS => data = Vorbis.decode_file(file, bit_depth, std.heap.page_allocator) catch |err| return err,
-        .OGG_OPUS => data = Opus.decode_file(file, bit_depth, std.heap.page_allocator) catch |err| return err,
+        .WAVE => data = dr.WAV.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
+        .FLAC => data = dr.FLAC.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
+        .MP3 => data = dr.MP3.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
+        .OGG_VORBIS => data = Vorbis.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
+        .OGG_OPUS => data = Opus.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
         .UNIDENTIFIABLE => unreachable,
     }
 
     const al_format = switch (data.channels) {
-        1 => switch (data.bit_depth) {
-            .Signed16 => al.Formats.MONO16,
+        1 => switch (data.bit_format) {
+            .SignedInt16 => al.Formats.MONO16,
             .Float32 => al.Formats.MONO_FLOAT32,
         },
-        else => switch (data.bit_depth) {
-            .Signed16 => al.Formats.STEREO16,
+        else => switch (data.bit_format) {
+            .SignedInt16 => al.Formats.STEREO16,
             .Float32 => al.Formats.STEREO_FLOAT32,
         },
     };

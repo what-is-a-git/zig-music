@@ -1,21 +1,22 @@
 const std = @import("std");
 
-const audio_file = @import("audio_file.zig");
-const read_file = audio_file.read_file;
-const AudioFile = audio_file.AudioFile;
-const ReadFileError = audio_file.ReadFileError;
+const BitFormat = @import("../core/audio/format.zig").BitFormat;
+
+const AudioFile = @import("audio_file.zig");
+const read_file = AudioFile.read_file;
+const ReadFileError = AudioFile.ReadFileError;
 
 const c = @cImport({
     @cInclude("opusfile.h");
 });
 
-pub fn decode_file(file: std.fs.File, requested_depth: AudioFile.BitDepth, allocator: std.mem.Allocator) ReadFileError!AudioFile {
+pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
     const bytes = read_file(file, allocator) catch |err| switch (err) {
         else => return err,
     };
 
     var output: AudioFile = .{
-        .bit_depth = requested_depth,
+        .bit_format = requested_format,
     };
 
     const opus = c.op_open_memory(bytes.ptr, bytes.len, null);
@@ -23,8 +24,8 @@ pub fn decode_file(file: std.fs.File, requested_depth: AudioFile.BitDepth, alloc
     output.sample_rate = 48_000;
     output.frame_count = @intCast(c.op_pcm_total(opus, -1));
 
-    switch (requested_depth) {
-        .Signed16 => {
+    switch (requested_format) {
+        .SignedInt16 => {
             const size = output.get_size();
             output.frames = std.c.malloc(size);
 
