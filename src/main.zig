@@ -10,7 +10,21 @@ const AudioContext = @import("core/audio/context.zig");
 const InitError = AudioContext.InitError;
 
 pub fn main() !void {
+    const args = try std.process.argsAlloc(std.heap.page_allocator);
+    if (args.len < 2) {
+        std.debug.print("No file supplied\n", .{});
+        return;
+    }
+
     const cwd = std.fs.cwd();
+    const path = args[1];
+    const file = try cwd.openFile(path, .{});
+    const format = AudioFormat.identify_format(path);
+    if (format == .UNIDENTIFIABLE) {
+        std.log.err("Couldn't identify format from path '{s}'!", .{path});
+        return;
+    }
+
     const context = AudioContext.init() catch |err| switch (err) {
         InitError.FailedToOpenDevice => {
             std.log.err("Failed to open OpenAL device!", .{});
@@ -23,22 +37,7 @@ pub fn main() !void {
     };
     defer context.deinit();
 
-    const args = try std.process.argsAlloc(std.heap.page_allocator);
-    if (args.len < 2) {
-        std.debug.print("No file supplied\n", .{});
-        return;
-    }
-
-    const path = args[1];
-    const file = try cwd.openFile(path, .{});
-    const format = AudioFormat.identify_format(path);
-    if (format == .UNIDENTIFIABLE) {
-        std.log.err("Couldn't identify format from path '{s}'!", .{path});
-        return;
-    }
-
     const start = try std.time.Instant.now();
-
     const sampler = AudioSampler.init(file, format) catch |err| switch (err) {
         ReadFileError.Unseekable => {
             std.log.err("Given file was unseekable, exiting.", .{});
@@ -64,6 +63,6 @@ pub fn main() !void {
     std.debug.print("Took {} ms to decode file.\n", .{now.since(start) / std.time.ns_per_ms});
 
     while (sampler.is_playing()) {
-        std.time.sleep(1_000_000_000);
+        std.Thread.sleep(std.time.ns_per_s);
     }
 }

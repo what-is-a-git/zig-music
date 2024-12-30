@@ -74,13 +74,13 @@ fn build_stb_vorbis(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
 }
 
 fn build_libogg(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
-    const ogg = b.addStaticLibrary(.{ .name = "ogg", .target = target, .optimize = optimize });
-    ogg.linkLibC();
+    const libogg = b.addStaticLibrary(.{ .name = "libogg", .target = target, .optimize = optimize });
+    libogg.linkLibC();
 
-    ogg.addIncludePath(b.path("vendor/include/"));
-    ogg.addIncludePath(b.path("vendor/src/ogg/"));
+    libogg.addIncludePath(b.path("vendor/include/"));
+    libogg.addIncludePath(b.path("vendor/src/ogg/"));
 
-    ogg.addCSourceFiles(.{
+    libogg.addCSourceFiles(.{
         .root = b.path("vendor/src/ogg/"),
         .files = &.{
             "bitwise.c",
@@ -108,19 +108,18 @@ fn build_libogg(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
         },
     );
 
-    ogg.installConfigHeader(ogg_config_header);
-
-    return ogg;
+    libogg.installConfigHeader(ogg_config_header);
+    return libogg;
 }
 
 fn build_libopusfile(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
-    const opusfile = b.addStaticLibrary(.{ .name = "opusfile", .target = target, .optimize = optimize });
-    opusfile.linkLibC();
+    const libopusfile = b.addStaticLibrary(.{ .name = "libopusfile", .target = target, .optimize = optimize });
+    libopusfile.linkLibC();
 
-    opusfile.addIncludePath(b.path("vendor/include/"));
-    opusfile.addIncludePath(b.path("vendor/src/opusfile/src/"));
+    libopusfile.addIncludePath(b.path("vendor/include/"));
+    libopusfile.addIncludePath(b.path("vendor/src/opusfile/src/"));
 
-    opusfile.addCSourceFiles(.{
+    libopusfile.addCSourceFiles(.{
         .root = b.path("vendor/src/opusfile/src/"),
         .files = &.{
             "info.c",
@@ -130,7 +129,7 @@ fn build_libopusfile(b: *std.Build, target: std.Build.ResolvedTarget, optimize: 
         },
     });
 
-    return opusfile;
+    return libopusfile;
 }
 
 fn build_libopus(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
@@ -331,23 +330,23 @@ fn build_libopus(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
     };
 
     // the actual library
-    const opus = b.addStaticLibrary(.{ .name = "opus", .target = target, .optimize = optimize });
-    opus.linkLibC();
+    const libopus = b.addStaticLibrary(.{ .name = "libopus", .target = target, .optimize = optimize });
+    libopus.linkLibC();
 
-    opus.defineCMacro("USE_ALLOCA", null);
-    opus.defineCMacro("OPUS_BUILD", null);
-    opus.defineCMacro("HAVE_CONFIG_H", null);
+    libopus.defineCMacro("USE_ALLOCA", null);
+    libopus.defineCMacro("OPUS_BUILD", null);
+    libopus.defineCMacro("HAVE_CONFIG_H", null);
 
-    opus.addIncludePath(b.path("vendor/include"));
-    opus.addIncludePath(b.path("vendor/src/opus/"));
-    opus.addIncludePath(b.path("vendor/src/opus/src/"));
-    opus.addIncludePath(b.path("vendor/src/opus/celt/"));
-    opus.addIncludePath(b.path("vendor/src/opus/celt/arm"));
-    opus.addIncludePath(b.path("vendor/src/opus/silk/"));
-    opus.addIncludePath(b.path("vendor/src/opus/silk/float"));
-    opus.addIncludePath(b.path("vendor/src/opus/silk/fixed"));
+    libopus.addIncludePath(b.path("vendor/include"));
+    libopus.addIncludePath(b.path("vendor/src/opus/"));
+    libopus.addIncludePath(b.path("vendor/src/opus/src/"));
+    libopus.addIncludePath(b.path("vendor/src/opus/celt/"));
+    libopus.addIncludePath(b.path("vendor/src/opus/celt/arm"));
+    libopus.addIncludePath(b.path("vendor/src/opus/silk/"));
+    libopus.addIncludePath(b.path("vendor/src/opus/silk/float"));
+    libopus.addIncludePath(b.path("vendor/src/opus/silk/fixed"));
 
-    opus.addCSourceFiles(.{ .files = sources ++ silk_sources_float, .flags = &.{} });
+    libopus.addCSourceFiles(.{ .files = sources ++ silk_sources_float, .flags = &.{} });
     if (target.result.cpu.arch.isX86()) {
         const sse = target.result.cpu.features.isEnabled(@intFromEnum(std.Target.x86.Feature.sse));
         const sse2 = target.result.cpu.features.isEnabled(@intFromEnum(std.Target.x86.Feature.sse2));
@@ -363,7 +362,7 @@ fn build_libopus(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
                 .OPUS_X86_PRESUME_SSE2 = 1,
                 .OPUS_X86_PRESUME_SSE4_1 = 1,
             });
-            opus.addConfigHeader(config_header);
+            libopus.addConfigHeader(config_header);
         } else if (sse and sse2) {
             const config_header = b.addConfigHeader(.{ .style = .blank }, .{
                 .OPUS_X86_MAY_HAVE_SSE = 1,
@@ -371,26 +370,26 @@ fn build_libopus(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
                 .OPUS_X86_PRESUME_SSE = 1,
                 .OPUS_X86_PRESUME_SSE2 = 1,
             });
-            opus.addConfigHeader(config_header);
+            libopus.addConfigHeader(config_header);
         } else if (sse) {
             const config_header = b.addConfigHeader(.{ .style = .blank }, .{
                 .OPUS_X86_MAY_HAVE_SSE = 1,
                 .OPUS_X86_PRESUME_SSE = 1,
             });
-            opus.addConfigHeader(config_header);
+            libopus.addConfigHeader(config_header);
         }
 
-        opus.addCSourceFiles(.{ .files = celt_sources_x86 ++ silk_sources_x86, .flags = &.{} });
+        libopus.addCSourceFiles(.{ .files = celt_sources_x86 ++ silk_sources_x86, .flags = &.{} });
         if (sse) {
-            opus.addCSourceFiles(.{ .files = celt_sources_sse, .flags = &.{} });
+            libopus.addCSourceFiles(.{ .files = celt_sources_sse, .flags = &.{} });
         }
 
         if (sse2) {
-            opus.addCSourceFiles(.{ .files = celt_sources_sse2, .flags = &.{} });
+            libopus.addCSourceFiles(.{ .files = celt_sources_sse2, .flags = &.{} });
         }
 
         if (sse4_1) {
-            opus.addCSourceFiles(.{ .files = celt_sources_sse4_1 ++ silk_sources_sse4_1, .flags = &.{} });
+            libopus.addCSourceFiles(.{ .files = celt_sources_sse4_1 ++ silk_sources_sse4_1, .flags = &.{} });
         }
     }
 
@@ -402,14 +401,13 @@ fn build_libopus(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
             .OPUS_ARM_MAY_HAVE_NEON_INTR = neon,
             .OPUS_ARM_PRESUME_NEON_INTR = neon,
         });
-        opus.addConfigHeader(config_header);
-
-        opus.addCSourceFiles(.{ .files = celt_sources_arm ++ silk_sources_arm, .flags = &.{} });
+        libopus.addConfigHeader(config_header);
+        libopus.addCSourceFiles(.{ .files = celt_sources_arm ++ silk_sources_arm, .flags = &.{} });
 
         if (neon) {
-            opus.addCSourceFiles(.{ .files = celt_sources_arm_neon ++ silk_sources_arm_neon, .flags = &.{} });
+            libopus.addCSourceFiles(.{ .files = celt_sources_arm_neon ++ silk_sources_arm_neon, .flags = &.{} });
         }
     }
 
-    return opus;
+    return libopus;
 }
