@@ -1,8 +1,29 @@
 const std = @import("std");
+const al = @import("../../backend/al.zig");
 
 pub const BitFormat = enum {
     SignedInt16,
     Float32,
+
+    pub fn get_size(self: BitFormat) usize {
+        return switch (self) {
+            .SignedInt16 => @sizeOf(i16),
+            .Float32 => @sizeOf(f32),
+        };
+    }
+
+    pub fn to_al(self: BitFormat, channel_count: u32) c_int {
+        return switch (channel_count) {
+            1 => switch (self) {
+                .SignedInt16 => al.Formats.MONO16,
+                .Float32 => al.Formats.MONO_FLOAT32,
+            },
+            else => switch (self) {
+                .SignedInt16 => al.Formats.STEREO16,
+                .Float32 => al.Formats.STEREO_FLOAT32,
+            },
+        };
+    }
 };
 
 pub const SupportedFormat = enum {

@@ -3,8 +3,10 @@ const std = @import("std");
 const BitFormat = @import("../core/audio/format.zig").BitFormat;
 
 const AudioFile = @import("audio_file.zig");
-const read_file = AudioFile.read_file;
-const ReadFileError = AudioFile.ReadFileError;
+
+const FileReader = @import("file_reader.zig");
+const read_file = FileReader.read_file;
+const ReadFileError = FileReader.ReadFileError;
 
 const wav = @cImport({
     @cDefine("DR_WAV_NO_STDIO", "1");
@@ -23,10 +25,7 @@ const flac = @cImport({
 
 pub const WAV = struct {
     pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
-        const bytes = read_file(file, allocator) catch |err| switch (err) {
-            else => return err,
-        };
-
+        const bytes = read_file(file, allocator) catch |err| return err;
         var output: AudioFile = .{
             .bit_format = requested_format,
         };

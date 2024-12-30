@@ -123,7 +123,21 @@ pub const Source = struct {
         self.bind_id(buffer.al_buffer);
     }
 
-    // TODO: buffer queueing for streaming
+    pub fn get_processed_buffer_count(self: *const Source) i32 {
+        var count: i32 = undefined;
+        al.alGetSourcei(self.al_source, al.AL_BUFFERS_PROCESSED, &count);
+        return count;
+    }
+
+    pub fn unqueue_buffer(self: *const Source) Buffer {
+        var id: u32 = undefined;
+        al.alSourceUnqueueBuffers(self.al_source, 1, &id);
+        return .{ .al_buffer = id };
+    }
+
+    pub fn queue_buffer(self: *const Source, buffer: *const Buffer) void {
+        al.alSourceQueueBuffers(self.al_source, 1, &buffer.al_buffer);
+    }
 
     fn get_state(self: *const Source) c_int {
         var state: c_int = 0;

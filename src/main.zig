@@ -1,10 +1,10 @@
 const std = @import("std");
 
-const AudioFile = @import("backend/audio_file.zig");
-const ReadFileError = AudioFile.ReadFileError;
+const ReadFileError = @import("backend/file_reader.zig").ReadFileError;
+const StreamDecodeError = @import("backend/audio_stream.zig").DecodeError;
 
 const AudioFormat = @import("core/audio/format.zig");
-const AudioSampler = @import("core/audio/sampler.zig");
+const AudioStreamer = @import("core/audio/streamer.zig");
 const AudioContext = @import("core/audio/context.zig");
 const InitError = AudioContext.InitError;
 
@@ -37,7 +37,7 @@ pub fn main() !void {
     defer context.deinit();
 
     const start = try std.time.Instant.now();
-    const sampler = AudioSampler.init(file, format) catch |err| switch (err) {
+    const streamer = AudioStreamer.init(file, format) catch |err| switch (err) {
         ReadFileError.Unseekable => {
             std.log.err("Given file was unseekable, exiting.", .{});
             return;
@@ -51,17 +51,35 @@ pub fn main() !void {
             return;
         },
         ReadFileError.ZigError => {
-            std.log.err("Zig had an arbitrary error when decoding the audio file, exiting.", .{});
+            std.log.err("Zig had an arbitrary error when reading the file bytes, exiting.", .{});
+            return;
+        },
+        StreamDecodeError.InvalidStream => {
+            std.log.err("Failed to open valid audio stream for file, exiting.", .{});
+            return;
+        },
+        StreamDecodeError.AllocationError => {
+            std.log.err("Failed to allocate data for stream decoding, exiting.", .{});
             return;
         },
     };
-    sampler.set_volume(0.25);
-    sampler.play();
+    defer streamer.deinit();
+    streamer.set_volume(0.25);
+    streamer.set_looping(true);
+    streamer.play();
 
     const now = try std.time.Instant.now();
-    std.debug.print("Took {} ms to decode file.\n", .{now.since(start) / std.time.ns_per_ms});
+    std.debug.print("Took {} ms to start streaming file.\n", .{now.since(start) / std.time.ns_per_ms});
 
-    while (sampler.is_playing()) {
-        std.Thread.sleep(std.time.ns_per_s);
+    while (streamer.is_playing()) {
+        streamer.process() catch |err| switch (err) {
+            StreamDecodeError.AllocationError => {
+                std.log.err("Failed to allocate data for stream decoding, exiting.", .{});
+                return;
+            },
+            // You can't have an invalid stream when the stream is already properly opened.
+            else => unreachable,
+        };
+        std.Thread.sleep(std.time.ns_per_ms * 250);
     }
 }

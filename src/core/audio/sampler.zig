@@ -6,7 +6,7 @@ const Opus = @import("../../backend/opus.zig");
 const Vorbis = @import("../../backend/stb_vorbis.zig");
 
 const AudioFile = @import("../../backend/audio_file.zig");
-const ReadFileError = AudioFile.ReadFileError;
+const ReadFileError = @import("../../backend/file_reader.zig").ReadFileError;
 
 const AudioFormat = @import("format.zig");
 const BitFormat = AudioFormat.BitFormat;
@@ -43,7 +43,7 @@ pub fn init(file: std.fs.File, format: AudioFormat.SupportedFormat) ReadFileErro
         },
     };
     self.buffer.buffer_data(data.frames, al_format, @intCast(data.get_size()), @intCast(data.sample_rate));
-    data.free();
+    data.deinit();
 
     self.source.bind_buffer(&self.buffer);
     return self;
