@@ -16,6 +16,7 @@ const AudioStreamer = @This();
 
 pub const BUFFER_COUNT = 6;
 pub const BIT_FORMAT = BitFormat.Float32;
+pub const SAMPLE_RATE_DIVISION = 4;
 
 pub const DecodeError = AudioStream.DecodeError;
 pub const ReadFileError = @import("backend/file_reader.zig").ReadFileError;
@@ -78,7 +79,7 @@ pub fn fill_buffers(self: *AudioStreamer) AudioStream.DecodeError!void {
 }
 
 pub fn stream_into(self: *AudioStreamer, buffer: al.Buffer) AudioStream.DecodeError!void {
-    const FRAME_COUNT: usize = @divFloor(self.stream.sample_rate, 10);
+    const FRAME_COUNT: usize = @divFloor(self.stream.sample_rate, SAMPLE_RATE_DIVISION);
     const pcm: AudioStream.DecodedPCM = switch (self.format) {
         .WAV => WAV.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         .FLAC => FLAC.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
@@ -114,6 +115,8 @@ pub fn stream_into(self: *AudioStreamer, buffer: al.Buffer) AudioStream.DecodeEr
 }
 
 pub fn deinit(self: *const AudioStreamer) void {
+    self.stop();
+
     self.source.deinit();
     for (self.buffers) |buffer| {
         buffer.deinit();

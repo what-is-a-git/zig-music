@@ -51,10 +51,10 @@ pub fn main() !void {
     streamer.play();
 
     const now = try std.time.Instant.now();
-    std.debug.print("Took {} ms to start streaming file.\n", .{@as(f128, @floatFromInt(now.since(start))) / @as(f128, @floatFromInt(std.time.ns_per_ms))});
+    std.debug.print("Took {d} ms to start streaming file.\n", .{@as(f128, @floatFromInt(now.since(start))) / @as(f128, @floatFromInt(std.time.ns_per_ms))});
 
     while (streamer.is_playing()) {
-        streamer.process() catch break;
+        streamer.process() catch |err| std.log.err("{}", .{err});
         std.Thread.sleep(std.time.ns_per_ms * 250);
     }
 }
