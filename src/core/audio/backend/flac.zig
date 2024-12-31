@@ -36,11 +36,11 @@ fn seek_func(data: ?*anyopaque, offset: c_int, whence: c_uint) callconv(.C) c_ui
     return 0;
 }
 
-pub fn open_stream(file: std.fs.File) ReadFileError!AudioStream {
+pub fn open_stream(file: *std.fs.File) ReadFileError!AudioStream {
     var output: AudioStream = .{};
     output.file = file;
 
-    const drflac = c.drflac_open(read_func, seek_func, @alignCast(@ptrCast(&output.file)), null);
+    const drflac = c.drflac_open(read_func, seek_func, @alignCast(@ptrCast(file)), null);
     output.format_handle = @ptrCast(drflac);
     output.channels = @intCast(drflac.*.channels);
     output.sample_rate = @intCast(drflac.*.sampleRate);

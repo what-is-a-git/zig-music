@@ -7,11 +7,10 @@ frame_count: usize = undefined,
 channels: u32 = undefined,
 sample_rate: u32 = undefined,
 format_handle: ?*anyopaque = null,
-file: ?std.fs.File = null,
+file: ?*std.fs.File = null,
 
 pub const DecodeError = error{
     InvalidStream,
-    AllocationError,
 };
 
 pub const DecodedPCM = struct {

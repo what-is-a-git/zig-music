@@ -54,11 +54,11 @@ const zig_file_callbacks: c.OpusFileCallbacks = .{
     .close = close_func,
 };
 
-pub fn open_stream(file: std.fs.File) ReadFileError!AudioStream {
+pub fn open_stream(file: *std.fs.File) ReadFileError!AudioStream {
     var output: AudioStream = .{};
     output.file = file;
 
-    output.format_handle = c.op_open_callbacks(@ptrCast(@constCast(&output.file)), &zig_file_callbacks, null, 0, null);
+    output.format_handle = c.op_open_callbacks(@ptrCast(@constCast(file)), &zig_file_callbacks, null, 0, null);
     output.channels = @intCast(c.op_channel_count(@ptrCast(output.format_handle), -1));
     output.sample_rate = 48_000;
     output.frame_count = @intCast(c.op_pcm_total(@ptrCast(output.format_handle), -1));

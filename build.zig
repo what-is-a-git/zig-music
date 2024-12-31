@@ -136,6 +136,8 @@ fn build_libvorbis(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
             "vorbisfile.c",
             "vorbisenc.c",
         },
+        // WHY THE FUCK DO YOU NEED THIS AS WELL FOR LIBVORBIS??? ACTUALLY KILLING MYSEL-
+        .flags = &.{"-fno-sanitize=undefined"},
     });
     return libvorbis;
 }

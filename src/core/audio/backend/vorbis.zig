@@ -58,13 +58,13 @@ const zig_file_callbacks: c.ov_callbacks = .{
     .close_func = null,
 };
 
-pub fn open_stream(file: std.fs.File) ReadFileError!AudioStream {
+pub fn open_stream(file: *std.fs.File) ReadFileError!AudioStream {
     var output: AudioStream = .{};
     output.file = file;
 
     const vorbis_file: *c.OggVorbis_File = @alignCast(@ptrCast(std.c.malloc(@sizeOf(c.OggVorbis_File))));
-    if (c.ov_open_callbacks(@ptrCast(@constCast(&output.file)), vorbis_file, null, 0, zig_file_callbacks) < 0) {
-        return ReadFileError.DecodingError;
+    if (c.ov_open_callbacks(@ptrCast(@constCast(file)), vorbis_file, null, 0, zig_file_callbacks) < 0) {
+        return ReadFileError.CorruptFile;
     }
 
     const vorbis_info = c.ov_info(vorbis_file, -1);

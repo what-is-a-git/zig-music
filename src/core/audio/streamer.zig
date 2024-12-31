@@ -28,7 +28,7 @@ stream: AudioStream = undefined,
 sample: usize = 0,
 looping: bool = false,
 
-pub fn init(file: std.fs.File, format: AudioFormat.ContainerFormat) InitError!AudioStreamer {
+pub fn init(file: *std.fs.File, format: AudioFormat.ContainerFormat) InitError!AudioStreamer {
     var self: AudioStreamer = .{};
     self.format = format;
 
