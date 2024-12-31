@@ -144,6 +144,4 @@ pub fn close_stream(stream: AudioStream) void {
     if (stream.format_handle != null) {
         c.op_free(@ptrCast(stream.format_handle));
     }
-
-    stream.deinit();
 }

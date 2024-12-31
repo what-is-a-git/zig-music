@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const BitFormat = @import("../core/audio/format.zig").BitFormat;
+const BitFormat = @import("../format.zig").BitFormat;
 const AudioStream = @import("audio_stream.zig");
 
 const FileReader = @import("file_reader.zig");
@@ -11,49 +11,36 @@ const c = @cImport({
     @cInclude("dr_libs/dr_flac.h");
 });
 
-pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
-    const bytes = read_file(file, allocator) catch |err| switch (err) {
-        else => return err,
-    };
-
-    var output: AudioFile = .{
-        .bit_format = requested_format,
-    };
-
-    switch (requested_format) {
-        .SignedInt16 => {
-            output.frames = c.drflac_open_memory_and_read_pcm_frames_s16(
-                bytes.ptr,
-                bytes.len,
-                &output.channels,
-                &output.sample_rate,
-                &output.frame_count,
-                null,
-            );
-        },
-        .Float32 => {
-            output.frames = c.drflac_open_memory_and_read_pcm_frames_f32(
-                bytes.ptr,
-                bytes.len,
-                &output.channels,
-                &output.sample_rate,
-                &output.frame_count,
-                null,
-            );
-        },
+fn read_func(data: ?*anyopaque, buffer: ?*anyopaque, size: c_ulonglong) callconv(.C) c_ulonglong {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        const ptr: [*]u8 = @ptrCast(buffer);
+        return file.read(ptr[0..size]) catch return 0;
     }
 
-    allocator.free(bytes);
-    return output;
+    return 0;
 }
 
-pub fn open_stream(file: std.fs.File, allocator: std.mem.Allocator) ReadFileError!AudioStream {
-    var output: AudioStream = .{ .allocator = allocator };
+fn seek_func(data: ?*anyopaque, offset: c_int, whence: c_uint) callconv(.C) c_uint {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        switch (whence) {
+            c.drflac_seek_origin_current => file.seekBy(offset) catch return 0,
+            c.drflac_seek_origin_start => file.seekTo(@intCast(offset)) catch return 0,
+            else => unreachable,
+        }
 
-    const bytes = read_file(file, allocator) catch |err| return err;
-    output.file_bytes = bytes;
+        return 1;
+    }
 
-    const drflac = c.drflac_open_memory(bytes.ptr, bytes.len, null);
+    return 0;
+}
+
+pub fn open_stream(file: std.fs.File) ReadFileError!AudioStream {
+    var output: AudioStream = .{};
+    output.file = file;
+
+    const drflac = c.drflac_open(read_func, seek_func, @alignCast(@ptrCast(&output.file)), null);
     output.format_handle = @ptrCast(drflac);
     output.channels = @intCast(drflac.*.channels);
     output.sample_rate = @intCast(drflac.*.sampleRate);
@@ -63,10 +50,7 @@ pub fn open_stream(file: std.fs.File, allocator: std.mem.Allocator) ReadFileErro
 }
 
 pub fn decode_stream(stream: AudioStream, requested_format: BitFormat, count: usize) AudioStream.DecodeError!AudioStream.DecodedPCM {
-    var output: AudioStream.DecodedPCM = .{
-        .format = requested_format,
-        .allocator = stream.allocator,
-    };
+    var output: AudioStream.DecodedPCM = .{ .format = requested_format };
     if (stream.format_handle == null) {
         return AudioStream.DecodeError.InvalidStream;
     }
@@ -101,6 +85,4 @@ pub fn close_stream(stream: AudioStream) void {
     if (stream.format_handle != null) {
         c.drflac_close(@alignCast(@ptrCast(stream.format_handle)));
     }
-
-    stream.deinit();
 }

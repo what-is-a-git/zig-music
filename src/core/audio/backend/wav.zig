@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const BitFormat = @import("../core/audio/format.zig").BitFormat;
+const BitFormat = @import("../format.zig").BitFormat;
 const AudioStream = @import("audio_stream.zig");
 
 const FileReader = @import("file_reader.zig");
@@ -11,14 +11,37 @@ const c = @cImport({
     @cInclude("dr_libs/dr_wav.h");
 });
 
-pub fn open_stream(file: std.fs.File, allocator: std.mem.Allocator) ReadFileError!AudioStream {
-    var output: AudioStream = .{ .allocator = allocator };
+fn read_func(data: ?*anyopaque, buffer: ?*anyopaque, size: c_ulonglong) callconv(.C) c_ulonglong {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        const ptr: [*]u8 = @ptrCast(buffer);
+        return file.read(ptr[0..size]) catch return 0;
+    }
 
-    const bytes = read_file(file, allocator) catch |err| return err;
-    output.file_bytes = bytes;
+    return 0;
+}
+
+fn seek_func(data: ?*anyopaque, offset: c_int, whence: c_uint) callconv(.C) c_uint {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        switch (whence) {
+            c.drwav_seek_origin_current => file.seekBy(offset) catch return 0,
+            c.drwav_seek_origin_start => file.seekTo(@intCast(offset)) catch return 0,
+            else => unreachable,
+        }
+
+        return 1;
+    }
+
+    return 0;
+}
+
+pub fn open_stream(file: std.fs.File) ReadFileError!AudioStream {
+    var output: AudioStream = .{};
+    output.file = file;
 
     const drwav: *c.drwav = @alignCast(@ptrCast(std.c.malloc(@sizeOf(c.drwav))));
-    _ = c.drwav_init_memory(drwav, bytes.ptr, bytes.len, null);
+    _ = c.drwav_init(drwav, read_func, seek_func, @alignCast(@ptrCast(&output.file)), null);
 
     output.format_handle = @ptrCast(drwav);
     output.channels = @intCast(drwav.channels);
@@ -29,10 +52,7 @@ pub fn open_stream(file: std.fs.File, allocator: std.mem.Allocator) ReadFileErro
 }
 
 pub fn decode_stream(stream: AudioStream, requested_format: BitFormat, count: usize) AudioStream.DecodeError!AudioStream.DecodedPCM {
-    var output: AudioStream.DecodedPCM = .{
-        .format = requested_format,
-        .allocator = stream.allocator,
-    };
+    var output: AudioStream.DecodedPCM = .{ .format = requested_format };
     if (stream.format_handle == null) {
         return AudioStream.DecodeError.InvalidStream;
     }
@@ -68,6 +88,4 @@ pub fn close_stream(stream: AudioStream) void {
         _ = c.drwav_uninit(@alignCast(@ptrCast(stream.format_handle)));
         std.c.free(stream.format_handle);
     }
-
-    stream.deinit();
 }

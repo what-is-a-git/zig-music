@@ -38,11 +38,11 @@ pub fn init(file: std.fs.File, format: AudioFormat.ContainerFormat) InitError!Au
     }
 
     self.stream = switch (format) {
-        .WAV => WAV.open_stream(file, std.heap.page_allocator) catch |err| return err,
-        .FLAC => FLAC.open_stream(file, std.heap.page_allocator) catch |err| return err,
-        .MP3 => MP3.open_stream(file, std.heap.page_allocator) catch |err| return err,
-        .OGG_OPUS => Opus.open_stream(file, std.heap.page_allocator) catch |err| return err,
-        .OGG_VORBIS => Vorbis.open_stream(file, std.heap.page_allocator) catch |err| return err,
+        .WAV => WAV.open_stream(file) catch |err| return err,
+        .FLAC => FLAC.open_stream(file) catch |err| return err,
+        .MP3 => MP3.open_stream(file) catch |err| return err,
+        .OGG_OPUS => Opus.open_stream(file) catch |err| return err,
+        .OGG_VORBIS => Vorbis.open_stream(file) catch |err| return err,
         else => unreachable,
     };
 

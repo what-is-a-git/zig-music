@@ -51,23 +51,7 @@ fn tell_func(data: ?*anyopaque) callconv(.C) c_long {
     return -1;
 }
 
-fn close_func(data: ?*anyopaque) callconv(.C) c_int {
-    if (data != null) {
-        const file: *std.fs.File = @alignCast(@ptrCast(data));
-        file.close();
-    }
-
-    return 0;
-}
-
 const zig_file_callbacks: c.ov_callbacks = .{
-    .read_func = read_func,
-    .seek_func = seek_func,
-    .tell_func = tell_func,
-    .close_func = close_func,
-};
-
-const zig_stream_callbacks: c.ov_callbacks = .{
     .read_func = read_func,
     .seek_func = seek_func,
     .tell_func = tell_func,
@@ -79,7 +63,7 @@ pub fn open_stream(file: std.fs.File) ReadFileError!AudioStream {
     output.file = file;
 
     const vorbis_file: *c.OggVorbis_File = @alignCast(@ptrCast(std.c.malloc(@sizeOf(c.OggVorbis_File))));
-    if (c.ov_open_callbacks(@ptrCast(@constCast(&output.file)), vorbis_file, null, 0, zig_stream_callbacks) < 0) {
+    if (c.ov_open_callbacks(@ptrCast(@constCast(&output.file)), vorbis_file, null, 0, zig_file_callbacks) < 0) {
         return ReadFileError.DecodingError;
     }
 
@@ -180,6 +164,4 @@ pub fn close_stream(stream: AudioStream) void {
         _ = c.ov_clear(@alignCast(@ptrCast(stream.format_handle)));
         std.c.free(stream.format_handle);
     }
-
-    stream.deinit();
 }
