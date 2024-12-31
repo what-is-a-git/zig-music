@@ -33,7 +33,7 @@ pub fn main() !void {
         },
     };
     defer context.deinit();
-    context.set_volume(0.25);
+    context.set_volume(0.1);
 
     const start = try std.time.Instant.now();
     const streamer = AudioStreamer.init(&file, format) catch |err| switch (err) {
