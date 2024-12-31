@@ -20,6 +20,18 @@ pub const Formats = struct {
     pub const STEREO_FLOAT32 = al.AL_FORMAT_STEREO_FLOAT32;
 };
 
+pub const Listener = struct {
+    pub fn get_volume() f32 {
+        var value: f32 = undefined;
+        al.alGetListenerf(al.AL_GAIN, &value);
+        return value;
+    }
+
+    pub fn set_volume(volume: f32) void {
+        al.alListenerf(al.AL_GAIN, volume);
+    }
+};
+
 pub const Device = struct {
     al_device: ?*al.ALCdevice = null,
 

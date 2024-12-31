@@ -32,3 +32,13 @@ pub fn deinit(self: *const AudioContext) void {
     self.device.deinit();
     self.context.deinit();
 }
+
+pub fn get_volume(self: *const AudioContext) f32 {
+    _ = self;
+    return al.Listener.get_volume();
+}
+
+pub fn set_volume(self: *const AudioContext, volume: f32) void {
+    _ = self;
+    al.Listener.set_volume(volume);
+}
