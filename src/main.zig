@@ -1,13 +1,8 @@
 const std = @import("std");
 
-const ReadFileError = @import("backend/file_reader.zig").ReadFileError;
-const StreamDecodeError = @import("backend/audio_stream.zig").DecodeError;
-
-const AudioFormat = @import("core/audio/format.zig");
-// const AudioSampler = @import("core/audio/sampler.zig");
-const AudioStreamer = @import("core/audio/streamer.zig");
 const AudioContext = @import("core/audio/context.zig");
-const InitError = AudioContext.InitError;
+const AudioStreamer = @import("core/audio/streamer.zig");
+const AudioFormat = @import("core/audio/format.zig");
 
 pub fn main() !void {
     const args = try std.process.argsAlloc(std.heap.page_allocator);
@@ -22,17 +17,17 @@ pub fn main() !void {
     defer file.close();
 
     const format = AudioFormat.identify_format(path);
-    if (format == .UNIDENTIFIABLE) {
-        std.log.err("Couldn't identify format from path '{s}'!", .{path});
+    if (format == .UNSUPPORTED) {
+        std.log.err("Unsupported container format at path '{s}'!", .{path});
         return;
     }
 
     const context = AudioContext.init() catch |err| switch (err) {
-        InitError.FailedToOpenDevice => {
+        AudioContext.InitError.FailedToOpenDevice => {
             std.log.err("Failed to open OpenAL device!", .{});
             return;
         },
-        InitError.FailedToCreateContext => {
+        AudioContext.InitError.FailedToCreateContext => {
             std.log.err("Failed to create OpenAL context!", .{});
             return;
         },
@@ -41,31 +36,31 @@ pub fn main() !void {
 
     const start = try std.time.Instant.now();
     const streamer = AudioStreamer.init(file, format) catch |err| switch (err) {
-        ReadFileError.Unseekable => {
+        AudioStreamer.ReadFileError.Unseekable => {
             std.log.err("Given file was unseekable, exiting.", .{});
             return;
         },
-        ReadFileError.FileTooBig => {
+        AudioStreamer.ReadFileError.FileTooBig => {
             std.log.err("Given file was too big to store in memory, exiting.", .{});
             return;
         },
-        ReadFileError.AccessDenied => {
+        AudioStreamer.ReadFileError.AccessDenied => {
             std.log.err("Given file couldn't be accessed, exiting.", .{});
             return;
         },
-        ReadFileError.DecodingError => {
+        AudioStreamer.ReadFileError.DecodingError => {
             std.log.err("There was an error decoding your file, try another one!", .{});
             return;
         },
-        ReadFileError.ZigError => {
+        AudioStreamer.ReadFileError.ZigError => {
             std.log.err("Zig had an arbitrary error when reading the file bytes, exiting.", .{});
             return;
         },
-        StreamDecodeError.InvalidStream => {
+        AudioStreamer.DecodeError.InvalidStream => {
             std.log.err("Failed to open valid audio stream for file, exiting.", .{});
             return;
         },
-        StreamDecodeError.AllocationError => {
+        AudioStreamer.DecodeError.AllocationError => {
             std.log.err("Failed to allocate data for stream decoding, exiting.", .{});
             return;
         },
@@ -80,7 +75,7 @@ pub fn main() !void {
 
     while (streamer.is_playing()) {
         streamer.process() catch |err| switch (err) {
-            StreamDecodeError.AllocationError => {
+            AudioStreamer.DecodeError.AllocationError => {
                 std.log.err("Failed to allocate data for stream decoding, exiting.", .{});
                 return;
             },

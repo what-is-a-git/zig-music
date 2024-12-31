@@ -1,5 +1,5 @@
 const std = @import("std");
-const al = @import("../../backend/al.zig");
+const al = @import("backend/al.zig");
 
 pub const BitFormat = enum {
     SignedInt16,
@@ -26,9 +26,9 @@ pub const BitFormat = enum {
     }
 };
 
-pub const SupportedFormat = enum {
+pub const ContainerFormat = enum {
     // .wav
-    WAVE,
+    WAV,
 
     FLAC,
     MP3,
@@ -43,27 +43,27 @@ pub const SupportedFormat = enum {
     /// it's technically possible if memory allocations
     /// on a small ascii lowercase version of the file
     /// extension fail.
-    UNIDENTIFIABLE,
+    UNSUPPORTED,
 };
 
 const FormatPairing = struct {
     extension: []const u8,
-    format: SupportedFormat,
+    format: ContainerFormat,
 };
 
 const pairings = [_]FormatPairing{
-    .{ .extension = ".wav", .format = .WAVE },
+    .{ .extension = ".wav", .format = .WAV },
     .{ .extension = ".flac", .format = .FLAC },
     .{ .extension = ".mp3", .format = .MP3 },
     .{ .extension = ".ogg", .format = .OGG_VORBIS },
     .{ .extension = ".opus", .format = .OGG_OPUS },
 };
 
-pub fn identify_format(file_path: []const u8) SupportedFormat {
+pub fn identify_format(file_path: []const u8) ContainerFormat {
     const raw_extension = std.fs.path.extension(file_path);
-    const lowercase_extension = std.ascii.allocLowerString(std.heap.page_allocator, raw_extension) catch return SupportedFormat.UNIDENTIFIABLE;
+    const lowercase_extension = std.ascii.allocLowerString(std.heap.page_allocator, raw_extension) catch return ContainerFormat.UNSUPPORTED;
 
-    var format = SupportedFormat.UNIDENTIFIABLE;
+    var format = ContainerFormat.UNSUPPORTED;
     for (pairings) |pairing| {
         if (std.mem.eql(u8, lowercase_extension, pairing.extension)) {
             format = pairing.format;

@@ -1,5 +1,5 @@
 const std = @import("std");
-const al = @import("../../backend/al.zig");
+const al = @import("backend/al.zig");
 const AudioContext = @This();
 
 device: al.Device = undefined,

@@ -1,12 +1,13 @@
 const std = @import("std");
-const al = @import("../../backend/al.zig");
+const al = @import("backend/al.zig");
 
-const dr = @import("../../backend/dr_libs.zig");
-const Opus = @import("../../backend/opus.zig");
-const Vorbis = @import("../../backend/vorbis.zig");
+const WAV = @import("backend/wav.zig");
+const FLAC = @import("backend/flac.zig");
+const MP3 = @import("backend/mp3.zig");
+const Opus = @import("backend/opus.zig");
+const Vorbis = @import("backend/vorbis.zig");
 
-const AudioStream = @import("../../backend/audio_stream.zig");
-const ReadFileError = @import("../../backend/file_reader.zig").ReadFileError;
+const AudioStream = @import("backend/audio_stream.zig");
 
 const AudioFormat = @import("format.zig");
 const BitFormat = AudioFormat.BitFormat;
@@ -16,16 +17,18 @@ const AudioStreamer = @This();
 pub const BUFFER_COUNT = 6;
 pub const BIT_FORMAT = BitFormat.Float32;
 
+pub const DecodeError = AudioStream.DecodeError;
+pub const ReadFileError = @import("backend/file_reader.zig").ReadFileError;
+pub const InitError = ReadFileError || DecodeError;
+
 source: al.Source = undefined,
 buffers: [BUFFER_COUNT]al.Buffer = undefined,
-format: AudioFormat.SupportedFormat = .UNIDENTIFIABLE,
+format: AudioFormat.ContainerFormat = .UNSUPPORTED,
 stream: AudioStream = undefined,
 sample: usize = 0,
 looping: bool = false,
 
-pub const InitError = ReadFileError || AudioStream.DecodeError;
-
-pub fn init(file: std.fs.File, format: AudioFormat.SupportedFormat) InitError!AudioStreamer {
+pub fn init(file: std.fs.File, format: AudioFormat.ContainerFormat) InitError!AudioStreamer {
     var self: AudioStreamer = .{};
     self.format = format;
 
@@ -35,9 +38,9 @@ pub fn init(file: std.fs.File, format: AudioFormat.SupportedFormat) InitError!Au
     }
 
     self.stream = switch (format) {
-        .WAVE => dr.WAV.open_stream(file, std.heap.page_allocator) catch |err| return err,
-        .FLAC => dr.FLAC.open_stream(file, std.heap.page_allocator) catch |err| return err,
-        .MP3 => dr.MP3.open_stream(file, std.heap.page_allocator) catch |err| return err,
+        .WAV => WAV.open_stream(file, std.heap.page_allocator) catch |err| return err,
+        .FLAC => FLAC.open_stream(file, std.heap.page_allocator) catch |err| return err,
+        .MP3 => MP3.open_stream(file, std.heap.page_allocator) catch |err| return err,
         .OGG_OPUS => Opus.open_stream(file, std.heap.page_allocator) catch |err| return err,
         .OGG_VORBIS => Vorbis.open_stream(file, std.heap.page_allocator) catch |err| return err,
         else => unreachable,
@@ -77,9 +80,9 @@ pub fn fill_buffers(self: *AudioStreamer) AudioStream.DecodeError!void {
 pub fn stream_into(self: *AudioStreamer, buffer: al.Buffer) AudioStream.DecodeError!void {
     const FRAME_COUNT: usize = @divFloor(self.stream.sample_rate, 10);
     const pcm: AudioStream.DecodedPCM = switch (self.format) {
-        .WAVE => dr.WAV.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
-        .FLAC => dr.FLAC.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
-        .MP3 => dr.MP3.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
+        .WAV => WAV.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
+        .FLAC => FLAC.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
+        .MP3 => MP3.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         .OGG_OPUS => Opus.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         .OGG_VORBIS => Vorbis.decode_stream(self.stream, BIT_FORMAT, FRAME_COUNT) catch |err| return err,
         else => unreachable,
@@ -117,9 +120,9 @@ pub fn deinit(self: *const AudioStreamer) void {
     }
 
     switch (self.format) {
-        .WAVE => dr.WAV.close_stream(self.stream),
-        .FLAC => dr.FLAC.close_stream(self.stream),
-        .MP3 => dr.MP3.close_stream(self.stream),
+        .WAV => WAV.close_stream(self.stream),
+        .FLAC => FLAC.close_stream(self.stream),
+        .MP3 => MP3.close_stream(self.stream),
         .OGG_OPUS => Opus.close_stream(self.stream),
         .OGG_VORBIS => Vorbis.close_stream(self.stream),
         else => unreachable,
@@ -149,9 +152,9 @@ pub fn get_time(self: *const AudioStreamer) f32 {
 fn raw_seek(self: *const AudioStreamer, seconds: f32) void {
     const sample: usize = @intFromFloat(@floor(seconds * @as(f32, @floatFromInt(self.stream.sample_rate))));
     switch (self.format) {
-        .WAVE => dr.WAV.seek_stream(self.stream, sample),
-        .FLAC => dr.FLAC.seek_stream(self.stream, sample),
-        .MP3 => dr.MP3.seek_stream(self.stream, sample),
+        .WAV => WAV.seek_stream(self.stream, sample),
+        .FLAC => FLAC.seek_stream(self.stream, sample),
+        .MP3 => MP3.seek_stream(self.stream, sample),
         .OGG_OPUS => Opus.seek_stream(self.stream, sample),
         .OGG_VORBIS => Vorbis.seek_stream(self.stream, sample),
         else => unreachable,

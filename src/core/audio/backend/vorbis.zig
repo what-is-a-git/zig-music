@@ -1,11 +1,9 @@
 const std = @import("std");
 
-const BitFormat = @import("../core/audio/format.zig").BitFormat;
 const AudioStream = @import("audio_stream.zig");
-const AudioFile = @import("audio_file.zig");
+const BitFormat = AudioStream.BitFormat;
 
 const FileReader = @import("file_reader.zig");
-const read_file = FileReader.read_file;
 const ReadFileError = FileReader.ReadFileError;
 
 const c = @cImport({
@@ -69,74 +67,6 @@ const zig_file_callbacks: c.ov_callbacks = .{
     .close_func = close_func,
 };
 
-pub fn decode_file(file: std.fs.File, requested_format: BitFormat) ReadFileError!AudioFile {
-    var output: AudioFile = .{
-        .bit_format = requested_format,
-    };
-
-    var vorbis_file: c.OggVorbis_File = undefined;
-    if (c.ov_open_callbacks(@ptrCast(@constCast(&file)), &vorbis_file, null, 0, zig_file_callbacks) < 0) {
-        return ReadFileError.DecodingError;
-    }
-
-    const vorbis_info = c.ov_info(&vorbis_file, -1);
-    output.channels = @intCast(vorbis_info.*.channels);
-    output.sample_rate = @intCast(vorbis_info.*.rate);
-    output.frame_count = @intCast(c.ov_pcm_total(&vorbis_file, -1));
-
-    switch (requested_format) {
-        .SignedInt16 => {
-            const size = output.get_size();
-            output.frames = std.c.malloc(size);
-
-            var index: usize = 0;
-            var bitstream: c_int = 0;
-            const cursor: usize = @intFromPtr(output.frames);
-            while (index < size) {
-                index += @intCast(c.ov_read(
-                    &vorbis_file,
-                    @ptrFromInt(cursor + index),
-                    @intCast(size - index),
-                    0,
-                    2,
-                    1,
-                    &bitstream,
-                ));
-            }
-        },
-        .Float32 => {
-            const size = output.get_size();
-            output.frames = std.c.malloc(size);
-            const frames: [*]f32 = @alignCast(@ptrCast(output.frames.?));
-
-            var index: usize = 0;
-            var frame_index: usize = 0;
-            var bitstream: c_int = 0;
-            while (index < output.frame_count) {
-                var pcm_channels: [*][*]f32 = undefined;
-                const read: usize = @intCast(c.ov_read_float(
-                    &vorbis_file,
-                    @ptrCast(&pcm_channels),
-                    @intCast(output.frame_count - index),
-                    &bitstream,
-                ));
-
-                for (0..read) |i| {
-                    for (0..output.channels) |channel| {
-                        frames[frame_index] = pcm_channels[channel][i];
-                        frame_index += 1;
-                    }
-                }
-
-                index += read;
-            }
-        },
-    }
-
-    _ = c.ov_clear(&vorbis_file);
-    return output;
-}
-
 const zig_stream_callbacks: c.ov_callbacks = .{
     .read_func = read_func,
     .seek_func = seek_func,
@@ -144,8 +74,8 @@ const zig_stream_callbacks: c.ov_callbacks = .{
     .close_func = null,
 };
 
-pub fn open_stream(file: std.fs.File, allocator: std.mem.Allocator) ReadFileError!AudioStream {
-    var output: AudioStream = .{ .allocator = allocator };
+pub fn open_stream(file: std.fs.File) ReadFileError!AudioStream {
+    var output: AudioStream = .{};
     output.file = file;
 
     const vorbis_file: *c.OggVorbis_File = @alignCast(@ptrCast(std.c.malloc(@sizeOf(c.OggVorbis_File))));
@@ -165,7 +95,6 @@ pub fn open_stream(file: std.fs.File, allocator: std.mem.Allocator) ReadFileErro
 pub fn decode_stream(stream: AudioStream, requested_format: BitFormat, count: usize) AudioStream.DecodeError!AudioStream.DecodedPCM {
     var output: AudioStream.DecodedPCM = .{
         .format = requested_format,
-        .allocator = stream.allocator,
     };
     if (stream.format_handle == null) {
         return AudioStream.DecodeError.InvalidStream;
