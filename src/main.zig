@@ -4,6 +4,7 @@ const ReadFileError = @import("backend/file_reader.zig").ReadFileError;
 const StreamDecodeError = @import("backend/audio_stream.zig").DecodeError;
 
 const AudioFormat = @import("core/audio/format.zig");
+// const AudioSampler = @import("core/audio/sampler.zig");
 const AudioStreamer = @import("core/audio/streamer.zig");
 const AudioContext = @import("core/audio/context.zig");
 const InitError = AudioContext.InitError;
@@ -52,6 +53,10 @@ pub fn main() !void {
             std.log.err("Given file couldn't be accessed, exiting.", .{});
             return;
         },
+        ReadFileError.DecodingError => {
+            std.log.err("There was an error decoding your file, try another one!", .{});
+            return;
+        },
         ReadFileError.ZigError => {
             std.log.err("Zig had an arbitrary error when reading the file bytes, exiting.", .{});
             return;
@@ -71,7 +76,7 @@ pub fn main() !void {
     streamer.play();
 
     const now = try std.time.Instant.now();
-    std.debug.print("Took {} ms to start streaming file.\n", .{now.since(start) / std.time.ns_per_ms});
+    std.debug.print("Took {} ms to start streaming file.\n", .{@as(f128, @floatFromInt(now.since(start))) / @as(f128, @floatFromInt(std.time.ns_per_ms))});
 
     while (streamer.is_playing()) {
         streamer.process() catch |err| switch (err) {

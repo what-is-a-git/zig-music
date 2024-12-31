@@ -9,6 +9,7 @@ channels: u32 = undefined,
 sample_rate: u32 = undefined,
 format_handle: ?*anyopaque = null,
 file_bytes: ?[]u8 = null,
+file: ?std.fs.File = null,
 
 pub fn deinit(self: *const AudioStream) void {
     if (self.file_bytes != null) {

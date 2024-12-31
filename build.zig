@@ -13,9 +13,9 @@ pub fn build(b: *std.Build) void {
 
     exe.linkLibC();
     exe.linkLibrary(build_dr_libs(b, target, optimize));
-    exe.linkLibrary(build_stb_vorbis(b, target, optimize));
 
     exe.linkLibrary(build_libogg(b, target, optimize));
+    exe.linkLibrary(build_libvorbis(b, target, optimize));
     exe.linkLibrary(build_libopus(b, target, optimize));
     exe.linkLibrary(build_libopusfile(b, target, optimize));
 
@@ -65,14 +65,6 @@ fn build_dr_libs(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
     return dr_libs;
 }
 
-fn build_stb_vorbis(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
-    const stb_vorbis = b.addStaticLibrary(.{ .name = "stb_vorbis", .target = target, .optimize = optimize });
-    stb_vorbis.linkLibC();
-    stb_vorbis.addIncludePath(b.path("vendor/include/stb/"));
-    stb_vorbis.addCSourceFile(.{ .file = b.path("vendor/src/stb/stb_vorbis.c") });
-    return stb_vorbis;
-}
-
 fn build_libogg(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
     const libogg = b.addStaticLibrary(.{ .name = "libogg", .target = target, .optimize = optimize });
     libogg.linkLibC();
@@ -110,6 +102,42 @@ fn build_libogg(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.b
 
     libogg.installConfigHeader(ogg_config_header);
     return libogg;
+}
+
+fn build_libvorbis(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {
+    const libvorbis = b.addStaticLibrary(.{ .name = "libvorbis", .target = target, .optimize = optimize });
+    libvorbis.linkLibC();
+    libvorbis.addIncludePath(b.path("vendor/include/"));
+    libvorbis.addIncludePath(b.path("vendor/src/vorbis/lib/"));
+    libvorbis.addCSourceFiles(.{
+        .root = b.path("vendor/src/vorbis/lib/"),
+        .files = &.{
+            "analysis.c",
+            "bitrate.c",
+            "block.c",
+            "codebook.c",
+            "envelope.c",
+            "floor0.c",
+            "floor1.c",
+            "info.c",
+            "lookup.c",
+            "lpc.c",
+            "lsp.c",
+            "mapping0.c",
+            "mdct.c",
+            "psy.c",
+            "registry.c",
+            "res0.c",
+            "sharedbook.c",
+            "smallft.c",
+            "synthesis.c",
+            "window.c",
+
+            "vorbisfile.c",
+            "vorbisenc.c",
+        },
+    });
+    return libvorbis;
 }
 
 fn build_libopusfile(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *std.Build.Step.Compile {

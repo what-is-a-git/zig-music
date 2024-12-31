@@ -3,7 +3,7 @@ const al = @import("../../backend/al.zig");
 
 const dr = @import("../../backend/dr_libs.zig");
 const Opus = @import("../../backend/opus.zig");
-const Vorbis = @import("../../backend/stb_vorbis.zig");
+const Vorbis = @import("../../backend/vorbis.zig");
 
 const AudioStream = @import("../../backend/audio_stream.zig");
 const ReadFileError = @import("../../backend/file_reader.zig").ReadFileError;
@@ -60,6 +60,14 @@ pub fn process_buffers(self: *AudioStreamer) AudioStream.DecodeError!void {
     }
 }
 
+pub fn clear_buffers(self: *AudioStreamer) void {
+    var ready_count: i32 = self.source.get_processed_buffer_count();
+    while (ready_count > 0) {
+        _ = self.source.unqueue_buffer();
+        ready_count -= 1;
+    }
+}
+
 pub fn fill_buffers(self: *AudioStreamer) AudioStream.DecodeError!void {
     for (self.buffers) |buffer| {
         self.stream_into(buffer) catch |err| return err;
@@ -79,9 +87,11 @@ pub fn stream_into(self: *AudioStreamer, buffer: al.Buffer) AudioStream.DecodeEr
     defer pcm.deinit();
 
     if (pcm.count == 0) {
-        // EOF
+        // we use raw_seek here because we aren't replaying the file
+        // and we are just looping the start data into a new buffer basically
+        // for (mostly) perfect looping :p
         if (self.looping and self.sample != 0) {
-            self.seek(0.0);
+            self.raw_seek(0.0);
             return self.stream_into(buffer);
         }
 
@@ -136,7 +146,7 @@ pub fn get_time(self: *const AudioStreamer) f32 {
     return @as(f32, @floatCast(self.sample)) / @as(f32, @floatCast(self.stream.sample_rate));
 }
 
-pub fn seek(self: *const AudioStreamer, seconds: f32) void {
+fn raw_seek(self: *const AudioStreamer, seconds: f32) void {
     const sample: usize = @intFromFloat(@floor(seconds * @as(f32, @floatFromInt(self.stream.sample_rate))));
     switch (self.format) {
         .WAVE => dr.WAV.seek_stream(self.stream, sample),
@@ -145,6 +155,22 @@ pub fn seek(self: *const AudioStreamer, seconds: f32) void {
         .OGG_OPUS => Opus.seek_stream(self.stream, sample),
         .OGG_VORBIS => Vorbis.seek_stream(self.stream, sample),
         else => unreachable,
+    }
+}
+
+pub fn seek(self: *const AudioStreamer, seconds: f32) void {
+    if (seconds < 0.0) {
+        seconds = 0.0;
+    }
+
+    const was_playing = self.is_playing();
+    self.stop();
+    self.raw_seek(seconds);
+    self.clear_buffers();
+    self.fill_buffers();
+
+    if (was_playing) {
+        self.play();
     }
 }
 

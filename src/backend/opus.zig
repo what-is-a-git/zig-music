@@ -12,13 +12,60 @@ const c = @cImport({
     @cInclude("opusfile.h");
 });
 
-pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: std.mem.Allocator) ReadFileError!AudioFile {
-    const bytes = read_file(file, allocator) catch |err| return err;
+fn read_func(data: ?*anyopaque, buffer: [*c]u8, size: c_int) callconv(.C) c_int {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        return @intCast(file.read(buffer[0..@intCast(size)]) catch return -1);
+    }
+
+    return -1;
+}
+
+fn seek_func(data: ?*anyopaque, offset: i64, whence: c_int) callconv(.C) c_int {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        switch (whence) {
+            std.c.SEEK.CUR => file.seekBy(offset) catch return -1,
+            std.c.SEEK.END => file.seekFromEnd(offset) catch return -1,
+            std.c.SEEK.SET => file.seekTo(@intCast(offset)) catch return -1,
+            else => unreachable,
+        }
+    }
+
+    return 0;
+}
+
+fn tell_func(data: ?*anyopaque) callconv(.C) i64 {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        return @intCast(file.getPos() catch return -1);
+    }
+
+    return -1;
+}
+
+fn close_func(data: ?*anyopaque) callconv(.C) c_int {
+    if (data != null) {
+        const file: *std.fs.File = @alignCast(@ptrCast(data));
+        file.close();
+    }
+
+    return 0;
+}
+
+const zig_file_callbacks: c.OpusFileCallbacks = .{
+    .read = read_func,
+    .seek = seek_func,
+    .tell = tell_func,
+    .close = close_func,
+};
+
+pub fn decode_file(file: std.fs.File, requested_format: BitFormat) ReadFileError!AudioFile {
     var output: AudioFile = .{
         .bit_format = requested_format,
     };
 
-    const opus = c.op_open_memory(bytes.ptr, bytes.len, null);
+    const opus = c.op_open_callbacks(@ptrCast(@constCast(&file)), &zig_file_callbacks, null, 0, null);
     output.channels = @intCast(c.op_channel_count(opus, -1));
     output.sample_rate = 48_000;
     output.frame_count = @intCast(c.op_pcm_total(opus, -1));
@@ -31,7 +78,7 @@ pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: st
             var index: usize = 0;
             const cursor: usize = @intFromPtr(output.frames);
             while (index < output.frame_count) {
-                const offset = index * output.channels * output.get_bit_size();
+                const offset = index * output.channels * output.bit_format.get_size();
                 index += @intCast(c.op_read(opus, @ptrFromInt(cursor + offset), @intCast(size - offset), null));
             }
         },
@@ -42,24 +89,33 @@ pub fn decode_file(file: std.fs.File, requested_format: BitFormat, allocator: st
             var index: usize = 0;
             const cursor: usize = @intFromPtr(output.frames);
             while (index < output.frame_count) {
-                const offset = index * output.channels * output.get_bit_size();
+                const offset = index * output.channels * output.bit_format.get_size();
                 index += @intCast(c.op_read_float(opus, @ptrFromInt(cursor + offset), @intCast(size - offset), null));
             }
         },
     }
 
     c.op_free(opus);
-    allocator.free(bytes);
     return output;
 }
 
+fn close_func_stream(data: ?*anyopaque) callconv(.C) c_int {
+    _ = data;
+    return 0;
+}
+
+const zig_stream_callbacks: c.OpusFileCallbacks = .{
+    .read = read_func,
+    .seek = seek_func,
+    .tell = tell_func,
+    .close = close_func_stream,
+};
+
 pub fn open_stream(file: std.fs.File, allocator: std.mem.Allocator) ReadFileError!AudioStream {
     var output: AudioStream = .{ .allocator = allocator };
+    output.file = file;
 
-    const bytes = read_file(file, allocator) catch |err| return err;
-    output.file_bytes = bytes;
-
-    output.format_handle = c.op_open_memory(bytes.ptr, bytes.len, null);
+    output.format_handle = c.op_open_callbacks(@ptrCast(@constCast(&output.file)), &zig_stream_callbacks, null, 0, null);
     output.channels = @intCast(c.op_channel_count(@ptrCast(output.format_handle), -1));
     output.sample_rate = 48_000;
     output.frame_count = @intCast(c.op_pcm_total(@ptrCast(output.format_handle), -1));

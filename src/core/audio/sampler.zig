@@ -3,7 +3,7 @@ const al = @import("../../backend/al.zig");
 
 const dr = @import("../../backend/dr_libs.zig");
 const Opus = @import("../../backend/opus.zig");
-const Vorbis = @import("../../backend/stb_vorbis.zig");
+const Vorbis = @import("../../backend/vorbis.zig");
 
 const AudioFile = @import("../../backend/audio_file.zig");
 const ReadFileError = @import("../../backend/file_reader.zig").ReadFileError;
@@ -27,8 +27,8 @@ pub fn init(file: std.fs.File, format: AudioFormat.SupportedFormat) ReadFileErro
         .WAVE => data = dr.WAV.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
         .FLAC => data = dr.FLAC.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
         .MP3 => data = dr.MP3.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
-        .OGG_VORBIS => data = Vorbis.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
-        .OGG_OPUS => data = Opus.decode_file(file, bit_format, std.heap.page_allocator) catch |err| return err,
+        .OGG_VORBIS => data = Vorbis.decode_file(file, bit_format) catch |err| return err,
+        .OGG_OPUS => data = Opus.decode_file(file, bit_format) catch |err| return err,
         .UNIDENTIFIABLE => unreachable,
     }
 
