@@ -24,8 +24,12 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag == .windows) {
         exe.linkSystemLibrary("al-soft/OpenAL32");
         b.installFile("vendor/lib/al-soft/OpenAL32.dll", "bin/OpenAL32.dll");
+
+        exe.linkSystemLibrary("sdl3/SDL3");
+        b.installFile("vendor/lib/sdl3/SDL3.dll", "bin/SDL3.dll");
     } else {
         exe.linkSystemLibrary("openal");
+        exe.linkSystemLibrary("sdl3");
     }
 
     exe.addIncludePath(b.path("vendor/include"));
